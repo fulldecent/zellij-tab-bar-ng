@@ -1,0 +1,26 @@
+# Pointer on column 47, the + glyph.
+# On this 80-column line the plus button occupies columns 45 through 49,
+# and that face uses the theme hover color.
+name: hover
+plugin: ../target/wasm32-wasip1/release/plugin.wasm
+geometry:
+  rows: 1
+  cols: 80
+steps:
+  - action: grant_permissions
+  - action: mode_update
+    mode: normal
+    session: demo
+  - action: tab_update
+    tabs:
+      - name: "Tab #1"
+        active: false
+        tiled: 1
+      - name: "Tab #2"
+        active: true
+        tiled: 2
+      - name: "Tab #3"
+        active: false
+        tiled: 1
+  - action: event_json
+    json: '{"Mouse":{"Hover":[0,47]}}'

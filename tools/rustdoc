@@ -1,0 +1,47 @@
+#!/bin/sh
+# Cargo build.rustdoc.
+# https://doc.rust-lang.org/cargo/reference/config.html#buildrustdoc
+#
+# Doctests load rlibs produced by tools/rustc-wrapper. A packaged rustdoc is a
+# different compiler build of the same version string and exits E0514,
+# "found crate compiled by an incompatible version of rustc".
+set -eu
+
+resolve() {
+  bin=$1
+  n=0
+  while [ -L "$bin" ] && [ "$n" -lt 8 ]; do
+    link=$(readlink "$bin")
+    case "$link" in
+      /*) bin=$link ;;
+      *) bin=$(dirname "$bin")/$link ;;
+    esac
+    n=$((n + 1))
+  done
+  printf '%s\n' "$bin"
+}
+
+sysroot_has_wasm() {
+  root=$(CDPATH= cd -- "$(dirname "$1")/.." && pwd)
+  [ -d "$root/lib/rustlib/wasm32-wasip1" ]
+}
+
+found=$(command -v rustdoc || true)
+if [ -n "$found" ]; then
+  real=$(resolve "$found")
+  if sysroot_has_wasm "$real"; then
+    exec "$real" "$@"
+  fi
+fi
+
+if ! command -v rustup >/dev/null 2>&1; then
+  exec rustdoc "$@"
+fi
+
+here=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
+channel=$(sed -n 's/^channel *= *"\([^"]*\)".*/\1/p' "$here/rust-toolchain.toml" | head -n 1)
+if [ -z "$channel" ]; then
+  echo "tools/rustdoc: rust-toolchain.toml has no channel" >&2
+  exit 1
+fi
+exec "$(rustup which --toolchain "$channel" rustdoc)" "$@"

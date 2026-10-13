@@ -1,0 +1,8 @@
+[build]
+target = "wasm32-wasip1"
+# PATH rustc may be a packaged compiler with no wasm32-wasip1 sysroot.
+# https://doc.rust-lang.org/cargo/reference/config.html#buildrustc-wrapper
+rustc-wrapper = "tools/rustc-wrapper"
+# Doctests must use the rustdoc that matches that rustc.
+# https://doc.rust-lang.org/cargo/reference/config.html#buildrustdoc
+rustdoc = "tools/rustdoc"

@@ -1,0 +1,16 @@
+[package]
+name = "plugin"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["William Entriken"]
+description = "Zellij Tab Bar Next-Generation: a ribbon, width-aware replacement for Zellij's default tab-bar plugin."
+repository = "https://github.com/fulldecent/zellij-tab-bar-ng"
+
+[lib]
+name = "plugin"
+path = "src/lib.rs"
+
+[dependencies]
+unicode-width = "0.2"
+zellij-tile = "0.45.1"

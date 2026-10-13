@@ -1,0 +1,23 @@
+# ModeUpdate supplies the session theme, Styling::from(default_palette()).
+# Three ribbon tabs, the second one active, plus the session placard.
+name: screenshot
+plugin: ../target/wasm32-wasip1/release/plugin.wasm
+geometry:
+  rows: 1
+  cols: 80
+steps:
+  - action: grant_permissions
+  - action: mode_update
+    mode: normal
+    session: demo
+  - action: tab_update
+    tabs:
+      - name: "Tab #1"
+        active: false
+        tiled: 1
+      - name: "Tab #2"
+        active: true
+        tiled: 2
+      - name: "Tab #3"
+        active: false
+        tiled: 1

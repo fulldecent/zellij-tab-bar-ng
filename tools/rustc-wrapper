@@ -1,0 +1,104 @@
+#!/bin/sh
+# Cargo build.rustc-wrapper.
+# https://doc.rust-lang.org/cargo/reference/config.html#buildrustc-wrapper
+#
+# The first argument is the rustc Cargo found on PATH. Homebrew, apt and dnf
+# often put their rustc ahead of rustup. That compiler has no wasm32-wasip1
+# standard library, so every crate fails with E0463 "can't find crate for
+# core". `rustup target add wasm32-wasip1` writes the library into the rustup
+# toolchain only. `rustup which cargo` and `rustup run <toolchain> cargo`
+# still leave PATH's rustc in place: this rustup (1.29) does not prepend the
+# toolchain bin.
+#
+# On macOS the toolchain rust-lld records @loader_path/../lib, which is
+# rustlib/$host/lib, plus a path from the rust build machine. libLLVM.dylib
+# lives in the toolchain lib directory. A wasm link aborts unless
+# DYLD_LIBRARY_PATH includes it.
+# https://github.com/rust-lang/rust/issues/76921
+# https://github.com/rust-lang/rust/pull/112247
+set -eu
+
+compiler=$1
+shift
+name=$(basename "$compiler")
+name=${name%.exe}
+
+case "$name" in
+  rustc|clippy-driver) ;;
+  *) exec "$compiler" "$@" ;;
+esac
+
+resolve() {
+  bin=$1
+  n=0
+  while [ -L "$bin" ] && [ "$n" -lt 8 ]; do
+    link=$(readlink "$bin")
+    case "$link" in
+      /*) bin=$link ;;
+      *) bin=$(dirname "$bin")/$link ;;
+    esac
+    n=$((n + 1))
+  done
+  printf '%s\n' "$bin"
+}
+
+sysroot_has_wasm() {
+  root=$(CDPATH= cd -- "$(dirname "$1")/.." && pwd)
+  [ -d "$root/lib/rustlib/wasm32-wasip1" ]
+}
+
+# Cargo passes the bare name `rustc`, not an absolute path.
+case "$compiler" in
+  */*) found=$compiler ;;
+  *) found=$(command -v "$compiler" || true) ;;
+esac
+if [ -z "${found}" ]; then
+  echo "tools/rustc-wrapper: cannot find $compiler" >&2
+  exit 1
+fi
+real=$(resolve "$found")
+if sysroot_has_wasm "$real"; then
+  chosen=$real
+else
+  if ! command -v rustup >/dev/null 2>&1; then
+    exec "$compiler" "$@"
+  fi
+  here=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
+  channel=$(sed -n 's/^channel *= *"\([^"]*\)".*/\1/p' "$here/rust-toolchain.toml" | head -n 1)
+  if [ -z "$channel" ]; then
+    echo "tools/rustc-wrapper: rust-toolchain.toml has no channel" >&2
+    exit 1
+  fi
+  chosen=$(rustup which --toolchain "$channel" "$name")
+fi
+
+# Only wasm links spawn rust-lld. Host compiles use the system linker.
+if [ "$(uname)" = Darwin ]; then
+  wasm_target=0
+  prev=
+  for arg in "$@"; do
+    if [ "$prev" = "--target" ]; then
+      case "$arg" in
+        wasm32-*) wasm_target=1 ;;
+      esac
+    fi
+    case "$arg" in
+      --target=wasm32-*) wasm_target=1 ;;
+    esac
+    prev=$arg
+  done
+  if [ "$wasm_target" = 1 ]; then
+    lib=$(CDPATH= cd -- "$(dirname "$(resolve "$chosen")")/../lib" && pwd)
+    if [ -f "$lib/libLLVM.dylib" ]; then
+      case ":${DYLD_LIBRARY_PATH-}:" in
+        *":$lib:"*) ;;
+        *)
+          DYLD_LIBRARY_PATH="$lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+          export DYLD_LIBRARY_PATH
+          ;;
+      esac
+    fi
+  fi
+fi
+
+exec "$chosen" "$@"

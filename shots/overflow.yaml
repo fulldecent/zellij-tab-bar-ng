@@ -1,0 +1,37 @@
+# Eight tabs at 80 columns. The active tab stays. The rest collapse to counts.
+name: overflow
+plugin: ../target/wasm32-wasip1/release/plugin.wasm
+geometry:
+  rows: 1
+  cols: 80
+steps:
+  - action: grant_permissions
+  - action: mode_update
+    mode: normal
+    session: demo
+  - action: tab_update
+    tabs:
+      - name: "Tab #1"
+        active: false
+        tiled: 1
+      - name: "Tab #2"
+        active: false
+        tiled: 1
+      - name: "Tab #3"
+        active: false
+        tiled: 1
+      - name: "Tab #4"
+        active: true
+        tiled: 1
+      - name: "Tab #5"
+        active: false
+        tiled: 1
+      - name: "Tab #6"
+        active: false
+        tiled: 1
+      - name: "Tab #7"
+        active: false
+        tiled: 1
+      - name: "Tab #8"
+        active: false
+        tiled: 1
