@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.0 (2026-10-13)
+
+
+### Features
+
+* add first implementation ([0093dfe](https://github.com/fulldecent/zellij-tab-bar-ng/commit/0093dfecf4ee06e4285a867a6c993fca0aa48641))
+
+## Changelog
+
 ## Unreleased
 
 - Ribbon tab bar from the prior tab-bar-ribbons sources, on the zellij-plugin-template layout.
