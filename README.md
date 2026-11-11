@@ -240,9 +240,9 @@ Out of scope:
 ## References
 
 1. We use "Title Case" only for proper nouns, this includes the name of our project.
-1. This project is built based on [best practices documented in zellij-plugin-template](https://github.com/fulldecent/zellij-plugin-template).
-1. This project is built based on [best practices documented in rust-template](https://github.com/fulldecent/rust-template/).
-1. This project is built based on [best practices documented in project-template](https://github.com/fulldecent/project-template).
+1. This project is built based on [best practices documented in zellij-plugin-template](https://github.com/fulldecent/zellij-plugin-template), release v0.5.0.
+1. This project is built based on [best practices documented in rust-template](https://github.com/fulldecent/rust-template/), release v1.1.1.
+1. This project is built based on [best practices documented in project-template](https://github.com/fulldecent/project-template), release v1.4.1.
 1. Zellij offers another installation method that points your layout configuration to an HTTPS URL. We consider that feature wrong and deprecated.
 1. We speak of the official rustup installation recommendation as ugly. [Reported upstream](https://github.com/rust-lang/rust/issues/163468).
 1. Render snapshots follow [Zellij Plugin Snapshot](https://github.com/fulldecent/zellij-plugin-snapshot) 0.2.2. [tests/snapshot.sh](tests/snapshot.sh) compares every `shots/*.yaml` against `shots/{name}.ansi.txt`. [screenshot.svg](screenshot.svg) is the picture in this README. Other SVG files stay beside their YAML scripts.
