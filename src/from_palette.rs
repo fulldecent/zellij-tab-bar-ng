@@ -10,6 +10,8 @@ pub fn chrome_from(style: &Style) -> Chrome {
         light: ink(colors.ribbon_unselected.background),
         plus_hover: ink(colors.ribbon_unselected.emphasis_1),
         title: ink(colors.text_unselected.base),
+        selected_text: ink(colors.ribbon_selected.base),
+        selected_fill: ink(colors.ribbon_selected.background),
     }
 }
 

@@ -64,7 +64,8 @@ fn hover_on_the_plus_uses_the_hover_ink() {
     let line = render_tab_line(80, &hovered);
     assert_ne!(line, plain);
     assert!(line.contains("48;5;255"));
-    assert!(!line.contains("48;5;245"));
+    assert!(line.contains("48;5;154"));
+    assert!(line.contains("48;5;245"));
 }
 
 #[test]

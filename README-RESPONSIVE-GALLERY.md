@@ -4,7 +4,7 @@ Pictures are SVG from [Zellij Plugin Snapshot](https://github.com/fulldecent/zel
 
 ## Three tabs
 
-The session placard, `Tab #1`, active `Tab #2`, `Tab #3`, and `+` when they fit. Default theme colors. The ribbon fills are the classic green and gray.
+The session placard, `Tab #1`, active `Tab #2`, `Tab #3`, and `+` when they fit. Default theme colors.
 
 ### 20
 
