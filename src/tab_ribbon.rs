@@ -756,6 +756,33 @@ mod tests {
     }
 
     #[test]
+    fn custom_selected_colors_paint_a_full_tab_and_a_clipped_tab() {
+        let chrome = Chrome {
+            bar: Ink::Bit(16),
+            dark: Ink::Bit(21),
+            light: Ink::Bit(22),
+            plus_hover: Ink::Bit(23),
+            title: Ink::Bit(255),
+            selected_text: Ink::Bit(31),
+            selected_fill: Ink::Bit(32),
+        };
+        let (wide, _) = render_tabs_themed(&tabs(2, 0), 80, None, true, &chrome, None);
+        assert!(wide.contains("38;5;31"));
+        assert!(wide.contains("48;5;32"));
+        assert!(wide.contains("38;5;21"));
+        assert!(wide.contains("48;5;22"));
+        assert!(!wide.contains("48;5;154"));
+        assert!(!wide.contains("48;5;238"));
+
+        let (clipped, _) = render_tabs_themed(&tabs(1, 0), 1, None, true, &chrome, None);
+        assert!(clipped.contains("38;5;31"));
+        assert!(clipped.contains("48;5;32"));
+        assert!(!clipped.contains("38;5;21"));
+        assert!(!clipped.contains("48;5;22"));
+        assert!(!clipped.contains("48;5;154"));
+    }
+
+    #[test]
     fn narrow_line_keeps_the_active_tab_and_counts_the_rest() {
         let (line, _) = render_tabs_themed(&tabs(6, 2), 36, None, false, &Chrome::default(), None);
         let text = visible_line(&line);
