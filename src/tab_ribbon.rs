@@ -7,18 +7,28 @@
 
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
-/// Theme inks for the bar, the plus button, and the session placard.
+/// Theme inks for the bar, the ribbons, and the session placard.
 /// Defaults match `Styling::from(default_palette())` on Zellij 0.45:
-/// bar 16, ribbon base 16, ribbon background 245, emphasis 255, text 255.
+/// bar 16, unselected base 16, unselected background 245, emphasis 255,
+/// selected base 16, selected background 154, text 255.
 ///
-/// The tab fills themselves stay the classic green 154 and gray 238.
+/// Zellij 0.45 has no `ribbon_hover` field. A hovered inactive tab uses
+/// `ribbon_unselected.emphasis_1` as its fill, which is what the official
+/// `ribbon_hover_style()` uses when the theme sets no hover ribbon.
 #[derive(Clone, Copy, Debug)]
 pub struct Chrome {
     pub bar: Ink,
+    /// `ribbon_unselected.base`. Text on an inactive tab.
     pub dark: Ink,
+    /// `ribbon_unselected.background`. Fill on an inactive tab.
     pub light: Ink,
+    /// `ribbon_unselected.emphasis_1`. Fill on a hovered inactive tab and on `+`.
     pub plus_hover: Ink,
     pub title: Ink,
+    /// `ribbon_selected.base`. Text on the active tab.
+    pub selected_text: Ink,
+    /// `ribbon_selected.background`. Fill and caps on the active tab.
+    pub selected_fill: Ink,
 }
 
 impl Default for Chrome {
@@ -29,6 +39,8 @@ impl Default for Chrome {
             light: Ink::Bit(245),
             plus_hover: Ink::Bit(255),
             title: Ink::Bit(255),
+            selected_text: Ink::Bit(16),
+            selected_fill: Ink::Bit(154),
         }
     }
 }
@@ -85,6 +97,21 @@ struct Piece {
     width: usize,
     ansi: String,
     action: Option<TabAction>,
+    /// Text between the caps. A flat piece is this text with no caps.
+    body: String,
+    selected: bool,
+    flat: bool,
+}
+
+fn blank(action: Option<TabAction>) -> Piece {
+    Piece {
+        width: 0,
+        ansi: String::new(),
+        action,
+        body: String::new(),
+        selected: false,
+        flat: true,
+    }
 }
 
 pub(crate) fn strip_ansi(rendered: &str) -> String {
@@ -256,11 +283,7 @@ fn collapse_piece(
     chrome: &Chrome,
 ) -> Piece {
     if count == 0 {
-        return Piece {
-            width: 0,
-            ansi: String::new(),
-            action: None,
-        };
+        return blank(None);
     }
     let body = match (style, side) {
         (Collapse::Long, Side::Left) => format!(" ← +{count} "),
@@ -277,23 +300,15 @@ fn collapse_piece(
 const PLUS_WIDTH: usize = 5;
 
 fn plus_button(chrome: &Chrome, hovered: bool) -> Piece {
-    let face = if hovered {
-        chrome.plus_hover
-    } else {
-        chrome.light
-    };
     let body = " + ";
-    let ink = face.fg();
-    let bar = chrome.bar.bg();
-    let fg = chrome.dark.fg();
-    let fill = face.bg();
-    let ansi = format!(
-        "\u{1b}[0m\u{1b}[{ink}m\u{1b}[{bar}m\u{e0ba}\u{1b}[0m\u{1b}[1;{fg}m\u{1b}[{fill}m{body}\u{1b}[0m\u{1b}[{ink}m\u{1b}[{bar}m\u{e0bc}\u{1b}[0m"
-    );
+    let ansi = paint_plus(body, hovered, chrome);
     Piece {
         width: 2 + col_width(body),
         ansi,
         action: Some(TabAction::NewTab),
+        body: body.to_string(),
+        selected: false,
+        flat: false,
     }
 }
 
@@ -319,11 +334,7 @@ fn full_tab(tab: &TabSpec, chrome: &Chrome) -> Piece {
 
 fn clip_ansi_piece(piece: &Piece, max_width: usize, chrome: &Chrome) -> Piece {
     if max_width == 0 {
-        return Piece {
-            width: 0,
-            ansi: String::new(),
-            action: piece.action,
-        };
+        return blank(piece.action);
     }
     // The active tab is shrunk through shrink_named when we know the name.
     // This fallback keeps an already-built piece inside the remaining columns.
@@ -331,8 +342,11 @@ fn clip_ansi_piece(piece: &Piece, max_width: usize, chrome: &Chrome) -> Piece {
     let clipped = truncate_cols(&visible, max_width);
     Piece {
         width: col_width(&clipped),
-        ansi: paint_raw(&clipped, false, chrome),
+        ansi: paint_flat(&clipped, piece.selected, false, chrome),
         action: piece.action,
+        body: clipped,
+        selected: piece.selected,
+        flat: true,
     }
 }
 
@@ -344,11 +358,7 @@ fn shrink_named(tab: &TabSpec, max_width: usize, chrome: &Chrome) -> Piece {
         return full;
     }
     if max_width == 0 {
-        return Piece {
-            width: 0,
-            ansi: String::new(),
-            action,
-        };
+        return blank(action);
     }
     let body_budget = max_width.saturating_sub(2);
     let body = if body_budget == 0 {
@@ -379,24 +389,82 @@ fn shrink_named(tab: &TabSpec, max_width: usize, chrome: &Chrome) -> Piece {
 }
 
 fn ribbon(body: &str, active: bool, action: Option<TabAction>, chrome: &Chrome) -> Piece {
-    // 154 and 238 are the classic Zellij ribbon fills (green active, gray inactive).
-    let (cap, fill) = if active { (154, 154) } else { (238, 238) };
-    let bar = chrome.bar.bg();
-    let text = chrome.dark.fg();
-    let ansi = format!(
-        "\u{1b}[0m\u{1b}[38;5;{cap}m\u{1b}[{bar}m\u{e0ba}\u{1b}[0m\u{1b}[{text}m\u{1b}[48;5;{fill}m{body}\u{1b}[0m\u{1b}[38;5;{cap}m\u{1b}[{bar}m\u{e0bc}\u{1b}[0m"
-    );
     Piece {
         width: 2 + col_width(body),
-        ansi,
+        ansi: paint_ribbon(body, active, false, chrome),
         action,
+        body: body.to_string(),
+        selected: active,
+        flat: false,
     }
 }
 
-fn paint_raw(text: &str, active: bool, chrome: &Chrome) -> String {
-    let fill = if active { 154 } else { 238 };
-    let text_fg = chrome.dark.fg();
-    format!("\u{1b}[0m\u{1b}[{text_fg}m\u{1b}[48;5;{fill}m{text}\u{1b}[0m")
+/// Active fill is `ribbon_selected`. Inactive fill is `ribbon_unselected`.
+/// Hover uses `ribbon_unselected.emphasis_1` and keeps the unselected text.
+fn ribbon_inks(selected: bool, hovered: bool, chrome: &Chrome) -> (Ink, Ink) {
+    if selected {
+        (chrome.selected_text, chrome.selected_fill)
+    } else if hovered {
+        (chrome.dark, chrome.plus_hover)
+    } else {
+        (chrome.dark, chrome.light)
+    }
+}
+
+fn paint_ribbon(body: &str, selected: bool, hovered: bool, chrome: &Chrome) -> String {
+    let (text, fill) = ribbon_inks(selected, hovered, chrome);
+    let cap = fill.fg();
+    let bar = chrome.bar.bg();
+    let fg = text.fg();
+    let bg = fill.bg();
+    format!(
+        "\u{1b}[0m\u{1b}[{cap}m\u{1b}[{bar}m\u{e0ba}\u{1b}[0m\u{1b}[{fg}m\u{1b}[{bg}m{body}\u{1b}[0m\u{1b}[{cap}m\u{1b}[{bar}m\u{e0bc}\u{1b}[0m"
+    )
+}
+
+fn paint_plus(body: &str, hovered: bool, chrome: &Chrome) -> String {
+    let (_, fill) = ribbon_inks(false, hovered, chrome);
+    let cap = fill.fg();
+    let bar = chrome.bar.bg();
+    let fg = chrome.dark.fg();
+    let bg = fill.bg();
+    format!(
+        "\u{1b}[0m\u{1b}[{cap}m\u{1b}[{bar}m\u{e0ba}\u{1b}[0m\u{1b}[1;{fg}m\u{1b}[{bg}m{body}\u{1b}[0m\u{1b}[{cap}m\u{1b}[{bar}m\u{e0bc}\u{1b}[0m"
+    )
+}
+
+fn paint_flat(text: &str, selected: bool, hovered: bool, chrome: &Chrome) -> String {
+    let (text_ink, fill) = ribbon_inks(selected, hovered, chrome);
+    format!(
+        "\u{1b}[0m\u{1b}[{}m\u{1b}[{}m{text}\u{1b}[0m",
+        text_ink.fg(),
+        fill.bg()
+    )
+}
+
+fn apply_hover(line: &mut [Piece], hover_col: Option<usize>, chrome: &Chrome) {
+    let Some(col) = hover_col else {
+        return;
+    };
+    let mut at = 0;
+    for piece in line.iter_mut() {
+        let end = at + piece.width;
+        if piece.width > 0 && col >= at && col < end {
+            match piece.action {
+                Some(TabAction::NewTab) => *piece = plus_button(chrome, true),
+                Some(_) if !piece.selected => {
+                    piece.ansi = if piece.flat {
+                        paint_flat(&piece.body, false, true, chrome)
+                    } else {
+                        paint_ribbon(&piece.body, false, true, chrome)
+                    };
+                }
+                _ => {}
+            }
+            return;
+        }
+        at = end;
+    }
 }
 
 fn prepare(tabs: &[TabSpec], cols: usize, chrome: &Chrome) -> (Vec<Piece>, Vec<Piece>, Vec<Piece>) {
@@ -419,17 +487,24 @@ pub(crate) fn render_tabs_themed(
     session_name: Option<&str>,
     hide_session_name: bool,
     chrome: &Chrome,
-    plus_hovered: bool,
+    hover_col: Option<usize>,
 ) -> (String, Vec<TabHit>) {
     if cols == 0 {
         return (String::new(), Vec::new());
     }
     let (prefix, prefix_w) = session_prefix(session_name, hide_session_name, cols, chrome);
     let tab_cols = cols - prefix_w;
+    let tab_hover = hover_col.and_then(|col| {
+        if tab_cols > 0 && col >= prefix_w && col < prefix_w + tab_cols {
+            Some(col - prefix_w)
+        } else {
+            None
+        }
+    });
     let (body, mut hits) = if tabs.is_empty() || tab_cols == 0 {
         (String::new(), Vec::new())
     } else {
-        render_tab_body(tabs, tab_cols, chrome, plus_hovered)
+        render_tab_body(tabs, tab_cols, chrome, tab_hover)
     };
     let body_w = painted_width(&body);
     for hit in &mut hits {
@@ -483,7 +558,7 @@ fn render_tab_body(
     tabs: &[TabSpec],
     cols: usize,
     chrome: &Chrome,
-    plus_hovered: bool,
+    hover_col: Option<usize>,
 ) -> (String, Vec<TabHit>) {
     let (before, after, middle) = prepare(tabs, cols, chrome);
     let mut line = try_fill(&before, &after, &middle, cols, Collapse::Long, chrome)
@@ -492,8 +567,9 @@ fn render_tab_body(
 
     let used = line.iter().map(|p| p.width).sum::<usize>();
     if used + PLUS_WIDTH <= cols {
-        line.push(plus_button(chrome, plus_hovered));
+        line.push(plus_button(chrome, false));
     }
+    apply_hover(&mut line, hover_col, chrome);
     clip_line(&mut line, cols);
     let hits = hits_of(&line);
     let ansi = line.into_iter().map(|p| p.ansi).collect();
@@ -543,7 +619,7 @@ mod tests {
                         None,
                         false,
                         &Chrome::default(),
-                        false,
+                        None,
                     );
                     let text = visible_line(&line);
                     assert!(
@@ -567,7 +643,7 @@ mod tests {
             Some("demo"),
             false,
             &Chrome::default(),
-            false,
+            None,
         );
         let text = visible_line(&line);
         assert!(text.starts_with(" Zellij (demo) "));
@@ -577,7 +653,6 @@ mod tests {
         assert!(text.contains('+'));
         assert!(!text.contains('←'));
         assert!(line.contains("48;5;154"));
-        assert!(line.contains("48;5;238"));
         assert!(line.contains("48;5;245"));
         let plus_at = column_of(&text, "+");
         assert!(hits.iter().any(|hit| {
@@ -597,7 +672,7 @@ mod tests {
             Some("demo"),
             false,
             &Chrome::default(),
-            false,
+            None,
         );
         let text = visible_line(&line);
         assert_eq!(col_width(&text), 80);
@@ -610,22 +685,106 @@ mod tests {
 
     #[test]
     fn plus_hover_uses_the_hover_ink() {
+        let tabs = tabs(3, 1);
+        let (plain, hits) =
+            render_tabs_themed(&tabs, 80, Some("demo"), false, &Chrome::default(), None);
+        let plus = hits
+            .iter()
+            .find(|hit| hit.action == TabAction::NewTab)
+            .expect("plus");
         let (line, _) = render_tabs_themed(
-            &tabs(3, 1),
+            &tabs,
             80,
             Some("demo"),
             false,
             &Chrome::default(),
-            true,
+            Some(plus.start),
         );
+        assert_ne!(line, plain);
         assert!(line.contains("48;5;255"));
-        assert!(!line.contains("48;5;245"));
+        assert!(line.contains("48;5;245"));
         assert!(line.contains("48;5;154"));
     }
 
     #[test]
+    fn inactive_tab_hover_uses_the_hover_ink() {
+        let tabs = tabs(3, 1);
+        let (plain, hits) =
+            render_tabs_themed(&tabs, 80, Some("demo"), false, &Chrome::default(), None);
+        let tab = hits
+            .iter()
+            .find(|hit| hit.action == TabAction::Switch(1))
+            .expect("tab 1");
+        let (line, _) = render_tabs_themed(
+            &tabs,
+            80,
+            Some("demo"),
+            false,
+            &Chrome::default(),
+            Some(tab.start),
+        );
+        assert_ne!(line, plain);
+        assert!(line.contains("48;5;255"));
+        assert!(line.contains("48;5;154"));
+    }
+
+    #[test]
+    fn active_tab_hover_keeps_the_selected_ink() {
+        let tabs = tabs(3, 1);
+        let (plain, hits) =
+            render_tabs_themed(&tabs, 80, Some("demo"), false, &Chrome::default(), None);
+        let tab = hits
+            .iter()
+            .find(|hit| hit.action == TabAction::Switch(2))
+            .expect("active tab");
+        let (line, _) = render_tabs_themed(
+            &tabs,
+            80,
+            Some("demo"),
+            false,
+            &Chrome::default(),
+            Some(tab.start),
+        );
+        assert_eq!(line, plain);
+    }
+
+    #[test]
+    fn clipped_active_tab_keeps_the_selected_fill() {
+        let (line, _) = render_tabs_themed(&tabs(1, 0), 1, None, true, &Chrome::default(), None);
+        assert!(line.contains("48;5;154"));
+        assert!(!line.contains("48;5;238"));
+    }
+
+    #[test]
+    fn custom_selected_colors_paint_a_full_tab_and_a_clipped_tab() {
+        let chrome = Chrome {
+            bar: Ink::Bit(16),
+            dark: Ink::Bit(21),
+            light: Ink::Bit(22),
+            plus_hover: Ink::Bit(23),
+            title: Ink::Bit(255),
+            selected_text: Ink::Bit(31),
+            selected_fill: Ink::Bit(32),
+        };
+        let (wide, _) = render_tabs_themed(&tabs(2, 0), 80, None, true, &chrome, None);
+        assert!(wide.contains("38;5;31"));
+        assert!(wide.contains("48;5;32"));
+        assert!(wide.contains("38;5;21"));
+        assert!(wide.contains("48;5;22"));
+        assert!(!wide.contains("48;5;154"));
+        assert!(!wide.contains("48;5;238"));
+
+        let (clipped, _) = render_tabs_themed(&tabs(1, 0), 1, None, true, &chrome, None);
+        assert!(clipped.contains("38;5;31"));
+        assert!(clipped.contains("48;5;32"));
+        assert!(!clipped.contains("38;5;21"));
+        assert!(!clipped.contains("48;5;22"));
+        assert!(!clipped.contains("48;5;154"));
+    }
+
+    #[test]
     fn narrow_line_keeps_the_active_tab_and_counts_the_rest() {
-        let (line, _) = render_tabs_themed(&tabs(6, 2), 36, None, false, &Chrome::default(), false);
+        let (line, _) = render_tabs_themed(&tabs(6, 2), 36, None, false, &Chrome::default(), None);
         let text = visible_line(&line);
         assert!(text.contains("Tab #3") || text.contains('…'));
         assert!(text.contains('+') || text.contains('…') || text.contains('←'));
@@ -640,7 +799,7 @@ mod tests {
             Some("demo"),
             false,
             &Chrome::default(),
-            false,
+            None,
         );
         assert_eq!(col_width(&visible_line(&line)), 1);
     }
@@ -654,7 +813,7 @@ mod tests {
             fullscreen: true,
             sync: true,
         }];
-        let (line, _) = render_tabs_themed(&tabs, 80, None, false, &Chrome::default(), false);
+        let (line, _) = render_tabs_themed(&tabs, 80, None, false, &Chrome::default(), None);
         let text = visible_line(&line);
         assert!(text.contains("Main [full] [sync]"));
     }
@@ -670,7 +829,7 @@ mod tests {
         }];
         for cols in 1..40 {
             let (line, hits) =
-                render_tabs_themed(&tabs, cols, None, false, &Chrome::default(), false);
+                render_tabs_themed(&tabs, cols, None, false, &Chrome::default(), None);
             let text = visible_line(&line);
             assert!(col_width(&text) <= cols, "{cols}: {text}");
             for hit in hits {

@@ -74,7 +74,7 @@ To upgrade: repeat [Try it out](#try-it-out) > step 1, then start a new session.
 
 The top row keeps the session placard (`Zellij` and the session name) and a `+` button. Tabs that do not fit collapse to `← +N` / `+N →`. A tab that still does not fit shrinks its name with `…`. Click a tab to switch to it. Click `+` to open a tab. Hovering `+` uses the theme hover color.
 
-The bar, the session placard, the `+` face, and the `+` hover color come from the session’s existing theme on `ModeUpdate`. The ribbon fills stay the classic green (active) and gray (inactive). There is no color config in this plugin.
+The bar, the session placard, the tab ribbons, and the `+` button come from the session’s existing theme on `ModeUpdate`. An active tab uses the selected ribbon. An inactive tab uses the unselected ribbon. Hovering an inactive tab or `+` uses the unselected emphasis color. There is no color config in this plugin.
 
 80 columns:
 
@@ -228,11 +228,11 @@ This tab bar is intended to replace the built-in Zellij tab bar ([`default-plugi
 
 * Ribbon tabs, with the active tab kept on screen
 * Responsive display that never exceeds the screen
-* Theme colors from the active Zellij session for the bar, the placard, and the `+` button
+* Theme colors from the active Zellij session for the bar, the placard, the ribbons, and the `+` button
 
 Out of scope:
 
-* No separate color scheme file. The ribbon fills stay the classic green and gray
+* No separate color scheme file
 * No format-string language or extra widgets
 * It does not replace the status bar
 * Layouts do not point at an HTTPS plugin URL
