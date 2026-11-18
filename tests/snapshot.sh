@@ -15,15 +15,15 @@ cd "$root"
 
 # Put the toolchain from rust-toolchain.toml first on PATH.
 
+PATH="${HOME}/.cargo/bin:${PATH}"
+export PATH
 if command -v rustup >/dev/null 2>&1; then
+  rustup show >/dev/null
   cargo_bin=$(rustup which cargo)
   bin=$(dirname "$cargo_bin")
-  PATH="$bin:${HOME}/.cargo/bin:${PATH}"
+  PATH="$bin:$PATH"
   DYLD_LIBRARY_PATH="$(CDPATH= cd -- "$bin/../lib" && pwd)${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
   export PATH DYLD_LIBRARY_PATH
-else
-  PATH="${HOME}/.cargo/bin:${PATH}"
-  export PATH
 fi
 
 if ! command -v zellij-plugin-snapshot >/dev/null 2>&1; then
