@@ -16,7 +16,8 @@ cd "$root"
 # Put the toolchain from rust-toolchain.toml first on PATH.
 
 if command -v rustup >/dev/null 2>&1; then
-  bin=$(dirname "$(rustup which cargo)")
+  cargo_bin=$(rustup which cargo)
+  bin=$(dirname "$cargo_bin")
   PATH="$bin:${HOME}/.cargo/bin:${PATH}"
   DYLD_LIBRARY_PATH="$(CDPATH= cd -- "$bin/../lib" && pwd)${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
   export PATH DYLD_LIBRARY_PATH
