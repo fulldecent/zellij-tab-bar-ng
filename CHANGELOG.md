@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/fulldecent/zellij-tab-bar-ng/compare/v0.2.0...v0.2.1) (2026-11-19)
+
+
+### Bug Fixes
+
+* install the toolchain before selecting cargo ([d4d8aa3](https://github.com/fulldecent/zellij-tab-bar-ng/commit/d4d8aa355d49fa733068c7121704dc2c13b8a8e0))
+* stop the snapshot script when rustup which fails ([653009a](https://github.com/fulldecent/zellij-tab-bar-ng/commit/653009a25842d7bc4f760741c9979a670fe6e1f1))
+
 ## [0.2.0](https://github.com/fulldecent/zellij-tab-bar-ng/compare/v0.1.0...v0.2.0) (2026-11-16)
 
 
