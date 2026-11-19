@@ -118,16 +118,7 @@ tab-bar location="zellij:tab-bar"
 
 Thank you for taking an interest in improving Zellij Tab Bar Next-Generation.
 
-You will need [rustup](https://rust-lang.github.io/rustup/), Git and your platform's native build tools. This project pins the toolchain in [rust-toolchain.toml](rust-toolchain.toml); rustup reads that file and installs matching `rustc`, Cargo, rustfmt, Clippy and the `wasm32-wasip1` target.
-
-A packaged `rustc` or `cargo` from apt, dnf or Homebrew does not apply `rust-toolchain.toml`. Install rustup, then invoke the toolchain rustup selected:
-
-```sh
-"$(rustup which rustc)" --version
-"$(rustup which cargo)" --version
-```
-
-`rustup which` prints the binary for the active toolchain (from `rust-toolchain.toml` in this directory). Quoting the command substitution runs that binary even when another `rustc` or `cargo` is earlier on `PATH`. That Cargo still searches `PATH` for `rustc`. A packaged `rustc` has no `wasm32-wasip1` standard library, so the build stops with E0463, `can't find crate for core`. [.cargo/config.toml](.cargo/config.toml) sets Cargo's [`rustc-wrapper`](https://doc.rust-lang.org/cargo/reference/config.html#buildrustc-wrapper) to [tools/rustc-wrapper](tools/rustc-wrapper), which runs the channel in `rust-toolchain.toml` when that happens. Doctests use [tools/rustdoc](tools/rustdoc) ([`build.rustdoc`](https://doc.rust-lang.org/cargo/reference/config.html#buildrustdoc)). A packaged `rustdoc` reports E0514 for rlibs that toolchain built.
+You will need Git, your platform's native build tools and the Rust tooling described in [rust-toolchain.toml](rust-toolchain.toml). We recommend rustup to manage your rust tooling, but install it using your system package manager rather than the dangerous methods on the rustup website ([ref](#references)).
 
 ### Linux
 
@@ -163,19 +154,35 @@ winget install --exact --id Microsoft.VisualStudio.2022.BuildTools --override "-
 winget install --exact --id Rustlang.Rustup
 ```
 
-Clone the project and build:
+Clone the project and build. On Linux and macOS:
+
+> [!NOTE]
+> If you do not require cross compilation, remove the `DYLD_LIBRARY_PATH="..."` part of all commands in this README.
 
 ```sh
 git clone https://github.com/fulldecent/zellij-tab-bar-ng.git
 cd zellij-tab-bar-ng
-"$(rustup which rustc)" --version
-"$(rustup which cargo)" --version
-"$(rustup which cargo)" check --locked
-"$(rustup which cargo)" build --locked
+rustup show
+cargo_bin=$(rustup which cargo)
+export PATH="$(dirname "$cargo_bin"):$PATH"
+export DYLD_LIBRARY_PATH="$(cd "$(dirname "$cargo_bin")/../lib" && pwd)" # macOS only; omit on Linux
+cargo check --locked
+cargo build --locked
 ```
 
-> [!NOTE]
-> Run those lines from this repository. `rust-toolchain.toml` is how the version is selected. If a check fails with “compiled by an incompatible version of rustc”, another compiler already wrote `target/`. That directory is gitignored. Remove it (`rm -rf target`) and run the same four lines again.
+In PowerShell:
+
+```powershell
+git clone https://github.com/fulldecent/zellij-tab-bar-ng.git
+Set-Location zellij-tab-bar-ng
+rustup show
+$cargo = rustup which cargo
+if (-not $cargo) { exit 1 }
+$bin = Split-Path $cargo
+$env:PATH = "$bin;$env:PATH"
+cargo check --locked
+cargo build --locked
+```
 
 Run this directly with:
 
@@ -186,18 +193,26 @@ zellij --layout layout/dev.kdl
 ### Testing
 
 ```sh
-"$(rustup which cargo)" test --locked --target "$("$(rustup which rustc)" -vV | sed -n 's/^host: //p')"
-"$(rustup which cargo)" fmt --all -- --check
-"$(rustup which cargo)" clippy --all-targets --locked -- -D warnings
-"$(rustup which cargo)" build --release --locked
+rustup show
+cargo_bin=$(rustup which cargo)
+export PATH="$(dirname "$cargo_bin"):$PATH"
+export DYLD_LIBRARY_PATH="$(cd "$(dirname "$cargo_bin")/../lib" && pwd)" # macOS only; omit on Linux
+cargo test --locked --target "$(rustc -vV | sed -n 's/^host: //p')"
+cargo fmt --all -- --check
+cargo clippy --all-targets --locked -- -D warnings
+cargo build --release --locked
 ```
 
-`cargo test` runs the Rust tests in `src/` and `tests/widths.rs`. Pass `--target` with the host triple from `rustup which rustc`. The target in [.cargo/config.toml](.cargo/config.toml) is `wasm32-wasip1`, and that wasm cannot run these tests. [tests/snapshot.sh](tests/snapshot.sh) builds the release wasm, runs every script in [shots/](shots/), and exits non-zero unless those bytes match the committed `shots/*.ansi.txt` files. SVG is traced. `diff` does not compare it. The 80-column picture is committed as [screenshot.svg](screenshot.svg) at the repository root. The other pictures are committed beside their YAML scripts.
+`cargo test` runs the Rust tests in `src/` and `tests/widths.rs`. The target in [.cargo/config.toml](.cargo/config.toml) is `wasm32-wasip1`, and that wasm cannot run these tests. [tests/snapshot.sh](tests/snapshot.sh) builds the release wasm, runs every script in [shots/](shots/), and exits non-zero unless those bytes match the committed `shots/*.ansi.txt` files. SVG is traced. `diff` does not compare it. The 80-column picture is committed as [screenshot.svg](screenshot.svg) at the repository root. The other pictures are committed beside their YAML scripts.
 
 The host is [Zellij Plugin Snapshot](https://github.com/fulldecent/zellij-plugin-snapshot) 0.2.2. Install that published crate once. `cargo install` compiles it and puts `zellij-plugin-snapshot` on `PATH`. `[dependencies]` and `[dev-dependencies]` link a library into the plugin wasm or into `cargo test`. This host is a command, so those fields leave it uninstalled.
 
 ```sh
-"$(rustup which cargo)" install zellij-plugin-snapshot --version 0.2.2 --locked
+rustup show
+cargo_bin=$(rustup which cargo)
+export PATH="$(dirname "$cargo_bin"):$PATH"
+export DYLD_LIBRARY_PATH="$(cd "$(dirname "$cargo_bin")/../lib" && pwd)" # macOS only; omit on Linux
+cargo install zellij-plugin-snapshot --version 0.2.2 --locked
 sh tests/snapshot.sh
 ```
 
@@ -240,6 +255,7 @@ Out of scope:
 ## References
 
 1. We use "Title Case" only for proper nouns, this includes the name of our project.
+1. We use a workaround so that rustup works without replacing your system Rust programs ([issue](https://github.com/rust-lang/rustup/issues/5025#issuecomment-6869331794)).
 1. This project is built based on [best practices documented in zellij-plugin-template](https://github.com/fulldecent/zellij-plugin-template), release v0.5.0.
 1. This project is built based on [best practices documented in rust-template](https://github.com/fulldecent/rust-template/), release v1.1.1.
 1. This project is built based on [best practices documented in project-template](https://github.com/fulldecent/project-template), release v1.4.1.
@@ -249,6 +265,5 @@ Out of scope:
 1. The fitting rule follows [Zellij’s `default-plugins/tab-bar`](https://github.com/zellij-org/zellij/tree/v0.45.1/default-plugins/tab-bar) at tag `v0.45.1` (MIT): keep the active tab, add neighbors toward the shorter side, and collapse the rest to `← +N` / `+N →`. Column width uses [`unicode-width`](https://docs.rs/unicode-width), as that tab bar does.
 1. Zellij 0.45.1 expands `~` in a `file:` plugin location. [Confirmed while shipping zellij-status-bar-ng](https://github.com/fulldecent/zellij-status-bar-ng).
 1. Release Please's [`rust` release type](https://github.com/googleapis/release-please/blob/main/docs/customizing.md) bumps [Cargo.toml](Cargo.toml) and [Cargo.lock](Cargo.lock). [`include-component-in-tag: false`](https://github.com/googleapis/release-please/blob/main/docs/manifest-releaser.md) keeps the GitHub tag `vMAJOR.MINOR.PATCH`.
-1. [tests/snapshot.sh](tests/snapshot.sh) runs Cargo with `rustup run` and the active toolchain. `rustup which cargo` is the inner toolchain binary. On GitHub Actions that binary was the default stable toolchain, which did not have `wasm32-wasip1`. `rustup run` does not put `rustc` on `PATH`. [tools/rustc-wrapper](tools/rustc-wrapper) is Cargo's `rustc-wrapper`. It runs the channel in [rust-toolchain.toml](rust-toolchain.toml) when `PATH`'s `rustc` has no `wasm32-wasip1` sysroot. [tools/rustdoc](tools/rustdoc) is `build.rustdoc`, so doctests load those rlibs. On macOS that compiler's `rust-lld` does not find `libLLVM.dylib` on its recorded rpath, so the wrapper sets `DYLD_LIBRARY_PATH` for wasm links ([rust-lang/rust#76921](https://github.com/rust-lang/rust/issues/76921)).
 1. The Rust ignore rules in [.gitignore](.gitignore) come from [GitHub's Rust gitignore](https://github.com/github/gitignore/blob/main/Rust.gitignore).
 1. This project is released under the [MIT license](./LICENSE.md).
